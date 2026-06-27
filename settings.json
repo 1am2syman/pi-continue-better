@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "summarizerModel": "inherit",
+  "toolResultBudget": 8000,
+  "maxTokens": 8192,
+  "appendFilesTouched": true,
+  "appendReadFileTags": true,
+  "appendModifiedFileTags": true,
+  "redactSecrets": true,
+  "notify": true
+}

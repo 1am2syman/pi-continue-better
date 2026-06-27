@@ -1,0 +1,16 @@
+# Node
+node_modules/
+*.log
+
+# Python (uv init scaffolding — present per request; the pi extension is TypeScript)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Pi local state
+.pi/continue/
+
+# OS
+.DS_Store
+Thumbs.db
