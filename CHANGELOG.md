@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+Maintenance release marker. No functional changes since 0.2.0 — version bump
+only. (Auto-resume, the 7-slot handoff, files-touched tracking, and the
+`/continue-better` status command all remain as in 0.2.0.)
+
 ## 0.2.0
 
 - **Auto-resume after compaction.** Hooks `session_compact` and sends a resume

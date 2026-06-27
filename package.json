@@ -1,6 +1,6 @@
 {
   "name": "pi-continue-better",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Same-session, high-fidelity compaction for pi-coding-agent. Fuses pi-continue's 7-slot ledger with /handoff's secret redaction + verbatim-quote allowance and grounded-compaction's files-touched tracking + model presets.",
   "license": "MIT",
   "author": "1am2syman",
