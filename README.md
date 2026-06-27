@@ -4,7 +4,9 @@
 > `/handoff` fidelity, but it stays in your session — no `/new`, no restart.
 
 `pi-continue-better` hooks pi's `session_before_compact` and replaces the default
-summarizer with a curated **continuation handoff** that combines the best ideas
+summarizer with a curated **continuation handoff**, then hooks `session_compact`
+to **automatically resume** the task in the same session — so you don't have to
+type "continue" after every compaction. It combines the best ideas
 from three community packages into one:
 
 | Source idea | What it contributes here |
@@ -14,8 +16,8 @@ from three community packages into one:
 | [`pi-grounded-compaction`](https://pi.dev/packages/pi-grounded-compaction) | Deterministic **files-touched tracking** + **summarizer model presets** |
 | this package | A **higher tool-result budget** than pi's stock 2000-char serialization, so the summarizer actually sees enough of long `bash`/`read` outputs to quote them verbatim — the concrete fidelity boost |
 
-Same task, same session, no restart. It fires on `/compact`, on the auto-compaction
-threshold, and on overflow recovery.
+Same task, same session, no restart, no manual "continue". It fires on `/compact`,
+on the auto-compaction threshold, and on overflow recovery.
 
 ## Install
 
@@ -73,6 +75,7 @@ Defaults ship in [`settings.json`](settings.json). Override per-user or per-proj
   "appendReadFileTags": true,      // <read-files> block (pi-native shape)
   "appendModifiedFileTags": true,  // <modified-files> block (pi-native shape)
   "redactSecrets": true,           // instructs the model + scrubs obvious patterns after
+  "autoResume": true,             // after compaction, auto-send a resume prompt so the agent continues
   "notify": true                   // info/warning notifications
 }
 ```
@@ -108,10 +111,28 @@ followed by an optional cumulative files-touched manifest and `<read-files>` /
 
 ## Failure policy
 
-The extension **fails open**. If the summarizer model can't be resolved, auth fails,
-the call errors, or the response is empty, it returns nothing and pi falls back to
-its built-in compaction. No raw directive text is leaked. Aborts are honored via the
-shared `signal`.
+The summarizer **fails open**. If the summarizer model can't be resolved, auth
+fails, the call errors, or the response is empty, it returns nothing and pi falls
+back to its built-in compaction. No raw directive text is leaked. Aborts are
+honored via the shared `signal`.
+
+## Auto-resume (new in 0.2.0)
+
+After a successful extension-owned compaction, `pi-continue-better` injects a
+labeled `pi-continue-better-resume` message with `triggerTurn: true` so the agent
+keeps working in the same session — no manual "continue" needed. This is the
+feature `pi-continue` is known for, now combined with the higher-fidelity
+handoff.
+
+Rules:
+- Fires after **manual `/compact`** and **threshold auto-compaction**.
+- **Never** fires on `overflow` — pi already auto-retries the aborted turn
+  (`willRetry: true`), so we never double-resume.
+- Only fires when this extension produced the compaction (`fromExtension: true`).
+- Opt out anytime: `{ "autoResume": false }`.
+
+If you'd rather drive compaction yourself and have the agent wait (pi's default),
+disable `autoResume`.
 
 ## Status command
 

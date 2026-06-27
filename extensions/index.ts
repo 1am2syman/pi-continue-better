@@ -50,6 +50,14 @@ interface PackageConfig {
 	appendModifiedFileTags: boolean;
 	/** Instruct the summarizer to redact secrets, and scrub obvious patterns after. */
 	redactSecrets: boolean;
+	/**
+	 * After compaction, automatically send a resume prompt so the agent continues
+	 * the task in the same session (no manual "continue" needed).
+	 * - manual `/compact`        -> resumed
+	 * - threshold auto-compaction -> resumed
+	 * - overflow                  -> NEVER resumed here (pi already retries via willRetry)
+	 */
+	autoResume: boolean;
 	/** Show info/warning notifications. */
 	notify: boolean;
 }
@@ -68,10 +76,25 @@ const DEFAULT_CONFIG: PackageConfig = {
 	appendReadFileTags: true,
 	appendModifiedFileTags: true,
 	redactSecrets: true,
+	autoResume: true,
 	notify: true,
 };
 
 const PACKAGE_NAME = "pi-continue-better";
+
+/** Message injected after compaction to make the agent continue in the same session. */
+const RESUME_PROMPT =
+	"You are resuming the SAME task in the SAME session immediately after an automatic context compaction. " +
+		"A continuation handoff was just inserted above summarizing all prior work. Read it and continue without being asked:\n" +
+		"- Execute the action under `## Next` (start with next[0]) and proceed through the plan.\n" +
+		"- Treat every item under `## Established` as proven; do NOT re-derive or re-verify it unless its `reopen when` condition has triggered.\n" +
+		"- Respect every item under `## Forbid`.\n" +
+		"- Only revisit `## Open` if it blocks the next step.\n" +
+		"Do not recap the handoff back to me. Do not ask whether to proceed. Just continue the work.";
+
+function errMsg(e: unknown): string {
+	return e instanceof Error ? e.message : String(e);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -445,6 +468,43 @@ ${conversationText}
 		}
 	});
 
+	// After compaction: automatically resume the task in the same session.
+	pi.on("session_compact", async (event, ctx) => {
+		const cfg = loadConfig(ctx.cwd);
+		if (!cfg.autoResume) return;
+		// Only resume on compactions WE produced.
+		if (!event.fromExtension) return;
+		// Overflow already auto-retries the aborted turn; never double-resume.
+		if (event.reason === "overflow" || event.willRetry) return;
+
+		const ui = ctx.ui;
+		const hasUI = ctx.hasUI;
+		const notify = cfg.notify;
+		const reason = event.reason;
+
+		// Defer one tick so the post-compaction reload settles before we trigger a turn.
+		setTimeout(() => {
+			try {
+				pi.sendMessage(
+					{
+						customType: "pi-continue-better-resume",
+						content: RESUME_PROMPT,
+						display: true,
+						details: { reason, source: PACKAGE_NAME },
+					},
+					{ triggerTurn: true },
+				);
+				if (notify && hasUI) {
+					ctx.ui.notify(`${PACKAGE_NAME}: resumed task after ${reason} compaction`, "info");
+				}
+			} catch (err) {
+				if (notify && hasUI) {
+					ui.notify(`${PACKAGE_NAME}: auto-resume failed (${errMsg(err)}); send a message to continue`, "warning");
+				}
+			}
+		}, 10);
+	});
+
 	// Lightweight status command.
 	pi.registerCommand("continue-better", {
 		description: "pi-continue-better: show config + last compaction run",
@@ -456,6 +516,7 @@ ${conversationText}
 			lines.push(`  toolResultBudget: ${cfg.toolResultBudget} chars (pi stock = 2000)`);
 			lines.push(`  maxTokens       : ${cfg.maxTokens}`);
 			lines.push(`  redactSecrets   : ${cfg.redactSecrets}`);
+			lines.push(`  autoResume      : ${cfg.autoResume} (resumes after manual + threshold; overflow is left to pi)`);
 			lines.push(`  filesTouched    : ${cfg.appendFilesTouched} | readTags=${cfg.appendReadFileTags} modTags=${cfg.appendModifiedFileTags}`);
 			lines.push("");
 			if (lastRun) {

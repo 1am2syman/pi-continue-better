@@ -7,5 +7,6 @@
   "appendReadFileTags": true,
   "appendModifiedFileTags": true,
   "redactSecrets": true,
+  "autoResume": true,
   "notify": true
 }

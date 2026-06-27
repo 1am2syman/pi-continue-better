@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.0
+
+- **Auto-resume after compaction.** Hooks `session_compact` and sends a resume
+  prompt so the agent continues the task in the same session without a manual
+  "continue". Fires after manual `/compact` and threshold auto-compaction.
+  Overflow is left untouched (pi already retries the aborted turn). Never
+  double-resumes (guards on `willRetry`).
+- Resume message is injected as a labeled `pi-continue-better-resume` custom
+  message with `triggerTurn: true`, not as fake user input.
+- New config key `autoResume` (default `true`) to opt out.
+- `/continue-better` status now reports the `autoResume` setting.
+
 ## 0.1.0
 
 - Initial release.
